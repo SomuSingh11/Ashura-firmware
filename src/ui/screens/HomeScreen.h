@@ -2,6 +2,7 @@
 #include "IScreen.h"
 #include "config.h"
 #include "../../ui/DisplayManager.h"
+#include "../../core/TimeManager.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <time.h>
@@ -101,21 +102,14 @@ class HomeScreen : public IScreen {
             _display.drawStr(0, 8, "Ashura Core");
 
             // ===== Clock HH:MM =====
-            // Use internal millis-based clock (No NTP Support as of now)
-            unsigned long totalSeconds = now / 1000;
-            int ss = totalSeconds % 60;
-            int mm = (totalSeconds / 60) % 60;
-            int hh = (totalSeconds / 3600) % 24;
-
-            char timeBuf[6];
-            sprintf(timeBuf, "%02d:%02d", hh, mm);
-
-            // ===== Draw big time
             _display.setFontLarge();
-            _display.drawStr(20, 38,  timeBuf);
+            char timeBuf[6];
+            sprintf(timeBuf, "%02d:%02d", Time().getHH(), Time().getMM());
+            _display.drawStr(20, 38, timeBuf);
 
-            // ===== Seconds Indicator =====
             // 60 dots across 120px, filled up to current second
+            // ===== Seconds =====
+            int ss = Time().getSS();
             _display.setFontSmall();
             char secBuf[4];
             sprintf(secBuf, ":%02d", ss);
@@ -124,6 +118,15 @@ class HomeScreen : public IScreen {
             // Seconds progress bar (thin line at bottom of clock area)
             int barWidth = (ss * 128) / 60;
             _display.drawLine(0, barWidth, 44, 44);
+
+            // ===== Uptime badge =====
+            if (!Time().isSynced()) {
+                _display.setFontSmall();
+                _display.drawStr(80, 63, "[Uptime]");
+            } else {
+                _display.setFontSmall();
+                _display.drawStr(80, 63, "[NTP]");
+            }
 
             // ===== Last Message (fades after 10 sec) =====
             if(_lastMessage.length() > 0 && now-_lastMessageTime < LASTMESSAGE_HOMESCREEN_TIMEOUT){
@@ -135,13 +138,17 @@ class HomeScreen : public IScreen {
 
             // ===== IP / Hint Footer =====
             _display.setFontSmall();
-            if(_lastMessage.length() == 0 || millis()-_lastMessageTime > LASTMESSAGE_HOMESCREEN_TIMEOUT){
-                String ip = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "No Network";
-                _display.drawStr(0, 63, ip.c_str());
+            if (_lastMessage.length() == 0 || millis() - _lastMessageTime > LASTMESSAGE_HOMESCREEN_TIMEOUT) {
+                if (!Time().isSynced()) {
+                    _display.drawStr(0, 63, "Syncing...");  // ← shown until NTP responds
+                } else {
+                    String ip = WiFi.status() == WL_CONNECTED
+                        ? WiFi.localIP().toString()
+                        : "No Network";
+                    _display.drawStr(0, 63, ip.c_str());
+                }
             }
 
-            // ===== Menu Hint
-            _display.drawStr(90, 63, "[OK=Menu]");
             _display.sendBuffer();
         }
         

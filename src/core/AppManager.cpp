@@ -1,5 +1,6 @@
 #include "AppManager.h"
 #include "EventBus.h"
+#include "TimeManager.h"
 #include "config.h"
 #include "pins.h"
 
@@ -44,34 +45,44 @@ void AppManager::init() {
   // ===== 6. Connect WiFi =====
   _wifi.init(WIFI_SSID, WIFI_PASSWORD);
 
-  // ===== 7. Init WebSocket =====
+  // ===== 7. NTP sync (only if WiFi connected) =====
+  if(_wifi.isConnected()){
+    Time().sync();
+  }
+
+  // ===== 8. Init WebSocket =====
   _websocket.init();
 
-  // ===== 8. Register Service =====
+  // ===== 9. Register Service =====
   _router.registerService(&_deviceService);
 
-  // ===== 9. Connect WebSocket =====
+  // ===== 10. Connect WebSocket =====
   _websocket.connect();
 
-  Serial.println("✅ ASHURA OS ready!");
+  Serial.println("✅ ASHURA Core ready!");
 }
 
 void AppManager::update() {
   // ===== Websocket update =====
   _websocket.update();
 
+  // ===== NTP retry until synced =====
+  if (_wifi.isConnected() && !Time().isSynced()) {
+    static unsigned long lastNtpRetry = 0;
+    if (millis() - lastNtpRetry > NTP_SYNC_INTERVAL) {
+      lastNtpRetry = millis();
+      Time().sync();
+    }
+  }
+
   // ===== UI tick =====
   _ui.update();
 
-  // ===== HomeScreen Signals =====
-  if(_homeScreen) {
-    if (_homeScreen->wantsMenu()){
-      _buildAppMenu();
-    }
-
-    if(_homeScreen->wantsScreenSaver()){
-      _lauchScreenSaver();
-    }
+  // ===== HomeScreen Signals (only when HomeScreen is active) =====
+  IScreen* active = _ui.currentScreen();
+  if (active == _homeScreen) {
+    if (_homeScreen->wantsMenu())        _buildAppMenu();
+    if (_homeScreen->wantsScreenSaver()) _lauchScreenSaver();
   }
 
   // ===== Physical Buttons =====
@@ -88,13 +99,13 @@ void AppManager::_wireEvents(){
 
   // WiFi -> display status
   Bus().subscribe(AppEvent::WifiConnected, [this](const String& ip) {
-    //_display.showBootStatus("WiFi Ok", ip.c_str()); // TODO: Replace this with Message Screen
-    //delay(1000);
+    // if(!Time().isSynced()){
+    //   Time().sync(); // Retry once if sync fails 
+    // }
   });
 
   Bus().subscribe(AppEvent::WifiDisconnected, [this](){
     //_display.showBootStatus("WiFi Failed", "Offline Mode"); // TODO: Replace this with Message Screen
-    //delay(1000);
   });
 
   // WebSocket Connection State -> Update HomeScreen Badge

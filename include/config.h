@@ -51,6 +51,7 @@
 #define SCREENSAVER_TIMEOUT 20000 // 20 seconds
 #define LASTMESSAGE_HOMESCREEN_TIMEOUT 10000 // 10 seconds
 #define BUTTON_DEBOUNCE_MS 30
+#define NTP_SYNC_INTERVAL 30000 // 30 seconds
 
 // ============================================
 // Application Configuration
