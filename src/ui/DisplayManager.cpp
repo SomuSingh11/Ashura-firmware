@@ -41,6 +41,10 @@ void DisplayManager::drawLine(int x1, int x2, int y1, int y2) {
     _display.drawLine(x1, y1, x2, y2);
 }
 
+void DisplayManager::drawBitmap(int x, int y, int w, int h, const uint8_t* bitmap) {
+    _display.drawXBMP(x, y, w, h, bitmap);
+}
+
 void DisplayManager::showBootStatus(const char* line1, const char* line2, const char* line3) {
     clear();
     setFontLarge();

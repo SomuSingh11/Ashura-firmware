@@ -22,6 +22,7 @@ class DisplayManager {
         void drawLine(int x1, int x2, int y1, int y2);
         int getWidth() const {return 128;};
         int getHeight() const {return 64;};
+        void drawBitmap(int x, int y, int w, int h, const uint8_t* bitmap);
 
         void showBootStatus(
             const char* line1,
