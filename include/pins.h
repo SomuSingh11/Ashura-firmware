@@ -1,4 +1,13 @@
 #pragma once
+// ============================================
+// OLED PIN Configuration (SSD1306 128x64)
+// ============================================
+// I2C pins for ESP32-S3
+#define OLED_SDA 8
+#define OLED_SCL 9
+#define OLED_ADDRESS 0x3C
+#define OLED_WIDTH 128
+#define OLED_HEIGHT 64
 
 // ============================================
 // Button PIN Configuration 

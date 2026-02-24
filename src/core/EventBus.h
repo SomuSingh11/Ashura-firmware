@@ -16,6 +16,7 @@ enum class AppEvent {
     // Messaging
     CommandReceived,
     NotificationReceived,
+    SendMessage,          // for outgoing WebSocket messages
 
     // Input
     ButtonUp,
@@ -23,14 +24,14 @@ enum class AppEvent {
     ButtonSelect,
     ButtonBack,
 
-
     // UI - Display
     DisplayNeedsUpdate,
     ScreensaverStart,
     ScreensaverStop,
 
     // System
-    SystemTick   // published every loop(), used by games/animations
+    SystemTick,   // published every loop(), used by games/animations
+    SystemBoot,    // published at the end of init()
 };
 
 struct EventSubscription {
