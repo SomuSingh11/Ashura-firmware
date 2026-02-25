@@ -1,7 +1,7 @@
 #pragma once
 #include "config.h"
 #include "../IScreen.h"
-#include "../../DisplayManager.h"
+#include "../../../core/DisplayManager.h"
 
 class PlasmaScreen : public IScreen {
 public:

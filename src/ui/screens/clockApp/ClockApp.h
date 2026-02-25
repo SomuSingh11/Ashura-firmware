@@ -1,11 +1,13 @@
 #pragma once
 #include "config.h"
-#include "../IScreen.h"
-#include "../../DisplayManager.h"
-#include "ClockFaceScreen.h"
+
 #include <vector>
 #include <functional>
 #include <Arduino.h>
+
+#include "../IScreen.h"
+#include "../../../core/DisplayManager.h"
+#include "ClockFaceScreen.h"
 
 
 class ClockApp : public IScreen {

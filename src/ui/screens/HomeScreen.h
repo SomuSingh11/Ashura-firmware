@@ -1,7 +1,7 @@
 #pragma once
 #include "IScreen.h"
 #include "config.h"
-#include "../../ui/DisplayManager.h"
+#include "../../core/DisplayManager.h"
 #include "../../core/TimeManager.h"
 #include <Arduino.h>
 #include <WiFi.h>

@@ -1,12 +1,12 @@
 #include <Arduino.h>
-#include "core/AppManager.h"
+#include "core/AshuraCore.h"
 
-AppManager app;
+AshuraCore core;
 
 void setup(){
-    app.init();
+    core.init();
 }
 
 void loop(){
-    app.update();
+    core.update();
 }
