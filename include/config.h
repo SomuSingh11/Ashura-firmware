@@ -3,8 +3,8 @@
 // ============================================
 // WiFi Configuration
 // ============================================
-#define WIFI_SSID "Mr. ROBOT"
-#define WIFI_PASSWORD "hyperspacex"
+#define WIFI_SSID "Akatsuki"
+#define WIFI_PASSWORD "coolkid11"
 
 // ============================================
 // WebSocket Server Configuration

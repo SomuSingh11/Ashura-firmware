@@ -6,9 +6,9 @@
 #include "TimeManager.h"
 #include "core/AshuraCore.h"
 
+#include "../ui/screens/SubMenuScreen.h"
 #include "../ui/screens/bootScreen/SplashScreen.h"
-#include "../ui/screens/clockApp/ClockApp.h"
-#include "../ui/screens/gamesApp/GamesApp.h"
+#include "../ui/screens/clockApp/ClockFaceScreen.h"
 #include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/screenSaver/PlasmaScreen.h"
 
@@ -100,19 +100,67 @@ void AshuraCore::update() {
 // ============================================================
 
 void AshuraCore::_registerApps() {
-  // ===== Clock =====
+  // ── Clock ─────────────────────────────────────────────────
   _loader.registerApp({
-    "clock", "Clock", ">_",
-    [this](DisplayManager& d) -> IScreen* {
-      return new ClockApp(d, [this](IScreen* s){ _ui.pushScreen(s); });
+    "clock","Clock", "clock",
+    [this](DisplayManager& d) -> IScreen*{
+      return new SubMenuScreen(d, "Clock", {
+        {"Clock Face", [this, &d]() { _ui.pushScreen(new ClockFaceScreen(d)); }},
+        {"Stopwatch", [this, &d]() { _ui.pushScreen(new ClockFaceScreen(d)); }},
+        {"Timer", [this, &d]() { _ui.pushScreen(new ClockFaceScreen(d)); }},
+        {"Pomodore", [this, &d]() { _ui.pushScreen(new ClockFaceScreen(d)); }},
+      });
     }
   });
 
-  // ===== Games =====
+  // ── Games ─────────────────────────────────────────────────
   _loader.registerApp({
-    "games", "Games", "⚙", 
+    "games", "Games", "games", 
     [this](DisplayManager& d) -> IScreen*{
-      return new GamesApp(d, [this](IScreen* s) { _ui.pushScreen(s); });
+      return new SubMenuScreen(d, "Games", {
+        {"Snake", [this, &d]() { /* _ui.pushScreen(new SnakeGame(d)); */ }},
+        {"Pong vs AI", [this, &d]() { /* _ui.pushScreen(new PongGame(d)); */ }},
+      });
+    }
+  });
+
+  // ── Spotify ───────────────────────────────────────────────
+  _loader.registerApp({
+    "spotify", "Spotify", "spotify",
+    [this](DisplayManager& d) -> IScreen*{
+      return new SubMenuScreen(d, "Spotify", {
+        {"Connect to Spotify", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
+        {"Now Playing", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
+        {"Browse", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
+        {"Search", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
+      });
+    }
+  });
+
+  // ── WLED ──────────────────────────────────────────────────
+  _loader.registerApp({
+    "wled", "WLED Controller", "wled",
+    [this](DisplayManager& d) -> IScreen*{
+      return new SubMenuScreen(d, "WLED Controller", {
+        {"Scan", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
+        {"Connect to WLED", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
+        {"Presets", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
+        {"Color Picker", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
+        {"Effects", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
+      });
+    }
+  });
+
+  // ── Settings ──────────────────────────────────────────────
+  _loader.registerApp({
+    "settings", "Settings", "settings",
+    [this](DisplayManager& d) -> IScreen*{
+      return new SubMenuScreen(d, "Settings", {
+        {"WiFi", [this, &d]() { /* _ui.pushScreen(new WiFiSettingsScreen(d)); */ }},
+        {"WebSocket", [this, &d]() { /* _ui.pushScreen(new WebSocketSettingsScreen(d)); */ }},
+        {"Device Info", [this, &d]() { /* _ui.pushScreen(new DeviceInfoScreen(d)); */ }},
+        {"System Logs", [this, &d]() { /* _ui.pushScreen(new SystemLogsScreen(d)); */ }},
+      });
     }
   });
 
