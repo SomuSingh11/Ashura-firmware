@@ -1,30 +1,53 @@
 #pragma once
 
+#pragma once
+
 // ================================================================
-//  AppMenuScreen  —  Flipper exact 3-row vertical menu
+//  AppMenuScreen  —  Exact 3-row vertical menu
 //
-//  128×64 layout — exact Flipper menu.c coordinates:
+//  128×64 OLED layout:
 //
 //  ┌────────────────────────────────────────────────────────────┐
-//  │ [icon]  Clock                    ← prev   y=3..16          │
+//  │ [icon]  Clock                    ← previous item           │
 //  │┌─────────────────────────────────────────────────────────┓ │
-//  ││[icon]  Spotify    ← selected row, frame                 ║ │
+//  ││[icon]  Spotify    ← selected row, framed                ║ │
 //  │┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝ │
-//  │ [icon]  Games                    ← next   y=47..58         │
+//  │ [icon]  Games                    ← next item               │
 //  │                                                ▐ scrollbar │
 //  └────────────────────────────────────────────────────────────┘
 //
-//  Frame around selected row:
-//    thin top + left border (1px)
-//    thick bottom + right border (2px) — gives a drop-shadow feel
+//  Selection frame styling:
+//    • Thin top + left border (1px)
+//    • Thick bottom + right border (2px)
+//    Creates subtle depth / shadow effect
 //
-//  Exact Flipper menu.c values:
-//    prev  icon@(4,3)   label@(22,14)   FontSecondary (5x7)
-//    sel   icon@(4,25)  label@(22,36)   FontPrimary   (6x10)
-//    next  icon@(4,47)  label@(22,58)   FontSecondary (5x7)
-//    frame region: x=0, y=21, w=123, h=21
+//  Layout coordinates:
 //
-//  No animation / no blinking. _dirty-only redraws.
+//    Previous row:
+//        icon  → (4, 3)
+//        label → (22, 14)
+//        FontSecondary (5×7)
+//
+//    Selected row:
+//        icon  → (4, 25)
+//        label → (22, 36)
+//        FontPrimary (6×10)
+//
+//    Next row:
+//        icon  → (4, 47)
+//        label → (22, 58)
+//        FontSecondary (5×7)
+//
+//    Frame region:
+//        x = 0
+//        y = 21
+//        w = 123
+//        h = 21
+//
+//  Rendering behaviour:
+//    • No animation
+//    • No blinking
+//    • Dirty-flag redraws only
 // ================================================================
 
 #include "IScreen.h"
@@ -101,7 +124,7 @@ inline const uint8_t* _appIcon(const String& id) {
     return _ic_default;
 }
 
-// ── Exact Flipper menu.c coordinates ─────────────────────────
+// ──  Menu coordinates ─────────────────────────
 static constexpr uint8_t IC_W       = 14;
 static constexpr uint8_t IC_H       = 14;
 
