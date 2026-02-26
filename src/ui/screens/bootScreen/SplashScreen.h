@@ -1,7 +1,8 @@
 #pragma once
-#include "../IScreen.h"
-#include "../../../ui/DisplayManager.h"
 #include <Arduino.h>
+#include "../IScreen.h"
+#include "../../../core/DisplayManager.h"
+
 
 class SplashScreen: public IScreen {
     public:

@@ -1,6 +1,6 @@
 #pragma once
 #include "IScreen.h"
-#include "../DisplayManager.h"
+#include "../../core/DisplayManager.h"
 #include <WiFi.h>
 
 // ============================================
