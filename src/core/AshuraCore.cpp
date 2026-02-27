@@ -13,6 +13,7 @@
 #include "../ui/screens/clockApp/ClockFaceScreen.h"
 #include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/screenSaver/PlasmaScreen.h"
+#include "../ui/screens/settings/SystemStatsScreen.h"
 
 
 // ============================================================
@@ -193,9 +194,9 @@ void AshuraCore::_registerApps()
                        [this](DisplayManager& d) -> IScreen*
                        {
                          return new SubMenuScreen(d, "Settings", {
+                                                                     {"System Stats", [this, &d]() {  _ui.pushScreen(new SystemStatsScreen(d));  }},
                                                                      {"WiFi", [this, &d]() { /* _ui.pushScreen(new WiFiSettingsScreen(d)); */ }},
                                                                      {"WebSocket", [this, &d]() { /* _ui.pushScreen(new WebSocketSettingsScreen(d)); */ }},
-                                                                     {"Device Info", [this, &d]() { /* _ui.pushScreen(new DeviceInfoScreen(d)); */ }},
                                                                      {"System Logs", [this, &d]() { /* _ui.pushScreen(new SystemLogsScreen(d)); */ }},
                                                                  });
                        } });
