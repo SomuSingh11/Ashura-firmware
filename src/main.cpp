@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "core/AshuraCore.h"
+#include "storage/AshuraPrefs.h"
 
 AshuraCore core;
 

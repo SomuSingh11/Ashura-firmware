@@ -5,16 +5,23 @@
 #include "EventBus.h"
 #include "TimeManager.h"
 #include "core/AshuraCore.h"
+#include "storage/AshuraPrefs.h"
 
-#include <vector>
-
+#include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/SubMenuScreen.h"
 #include "../ui/screens/bootScreen/SplashScreen.h"
+
+// ── Vibe system ───────────────────────────────────────────────
+#include "../ui/screens/vibes/VibePickerScreen.h"
+#include "../ui/screens/vibes/VibePreviewScreen.h"
+#include "../ui/screens/vibes/VibePlayerScreen.h"
+#include "../application/vibes/VibeRegistry.h"
+
 #include "../ui/screens/clockApp/ClockFaceScreen.h"
-#include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/screenSaver/PlasmaScreen.h"
 #include "../ui/screens/settings/SystemStatsScreen.h"
 
+#include <vector>
 
 // ============================================================
 //  AshuraOS::init  —  Full system boot
@@ -65,7 +72,7 @@ void AshuraCore::init()
 }
 
 // ============================================================
-//  AshuraOS::update  —  Main OS tick (called from loop())
+//  AshuraCore::update  —  Main OS tick (called from loop())
 // ============================================================
 
 void AshuraCore::update(){
@@ -129,91 +136,112 @@ void AshuraCore::update(){
 void AshuraCore::_registerApps()
 {
   // ── Clock ─────────────────────────────────────────────────
-  _loader.registerApp({ "clock", "Clock", "clock",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "Clock", {
-                                                                  {"Clock Face", [this, &d]()
-                                                                   { _ui.pushScreen(new ClockFaceScreen(d)); }},
-                                                                  {"Stopwatch", [this, &d]()
-                                                                   { _ui.pushScreen(new ClockFaceScreen(d)); }},
-                                                                  {"Timer", [this, &d]()
-                                                                   { _ui.pushScreen(new ClockFaceScreen(d)); }},
-                                                                  {"Pomodore", [this, &d]()
-                                                                   { _ui.pushScreen(new ClockFaceScreen(d)); }},
-                                                              });
-                       } });
+  _loader.registerApp({
+        "clock", "Clock", "clock",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "Clock", {
+                { "Clock Face", [this]() { _ui.pushScreen(new ClockFaceScreen(_display)); } },
+                { "Pomodoro",   [this]() {  } },
+                { "Stopwatch",  [this]() { } },
+            });
+        }
+    });
 
   // ── Games ─────────────────────────────────────────────────
-  _loader.registerApp({ "games", "Games", "games",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "Games", {
-                                                                  {"Snake", [this, &d]() { /* _ui.pushScreen(new SnakeGame(d)); */ }},
-                                                                  {"Pong vs AI", [this, &d]() { /* _ui.pushScreen(new PongGame(d)); */ }},
-                                                              });
-                       } });
+  _loader.registerApp({
+        "games", "Games", "games",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "Games", {
+                { "Snake",     [this]() {  } },
+            });
+        }
+    });
 
-  _loader.registerApp({ "ai", "AI", "ai",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "AI Assistant", {
-                                                                         {"Chat", [this]() { /* TODO */ }},
-                                                                         {"History", [this]() { /* TODO */ }},
-                                                                         {"Settings", [this]() { /* TODO */ }},
-                                                                     });
-                       } });
+  // ── AI Assitant ───────────────────────────────────────────────
+  _loader.registerApp({
+        "ai", "AI", "ai",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "AI Assistant", {
+                { "Chat",     [this]() { /* TODO */ } },
+                { "History",  [this]() { /* TODO */ } },
+                { "Settings", [this]() { /* TODO */ } },
+            });
+        }
+    });
+
+  // ── Vibes ──────────────────────────────────────────────────
+  _loader.registerApp({
+        "vibes", "Vibes", "vibes",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "Vibes", {
+                { "Screensaver", [this]() {
+                    _ui.pushScreen(new VibePickerScreen(
+                        _display, _ui, 0, AshuraPrefs::getScreensaver()));
+                }},
+                { "Boot Screen", [this]() {
+                    _ui.pushScreen(new VibePickerScreen(
+                        _display, _ui, 1, AshuraPrefs::getBoot()));
+                }},
+                { "Home Screen", [this]() {
+                    _ui.pushScreen(new VibePickerScreen(
+                        _display, _ui, 2, AshuraPrefs::getHomeScreen()));
+                }},
+            });
+        }
+    });
 
   // ── Spotify ───────────────────────────────────────────────
-  _loader.registerApp({ "spotify", "Spotify", "spotify",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "Spotify", {
-                                                                    {"Connect to Spotify", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
-                                                                    {"Now Playing", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
-                                                                    {"Browse", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
-                                                                    {"Search", [this, &d]() { /* _ui.pushScreen(new SpotifyScreen(d)); */ }},
-                                                                });
-                       } });
+  _loader.registerApp({
+        "spotify", "Spotify", "spotify",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "Spotify", {
+                { "Now Playing", [this]() { /* TODO */ } },
+                { "Browse",      [this]() { /* TODO */ } },
+                { "Search",      [this]() { /* TODO */ } },
+            });
+        }
+    });
 
   // ── WLED ──────────────────────────────────────────────────
-  _loader.registerApp({ "wled", "WLED Controller", "wled",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "WLED Controller", {
-                                                                        {"Scan", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
-                                                                            {"Connect to WLED", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
-                                                                            {"Presets", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
-                                                                            {"Color Picker", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
-                                                                            {"Effects", [this, &d]() { /* _ui.pushScreen(new WLEDScreen(d)); */ }},
-                                                                        });
-                       } });
+  _loader.registerApp({
+        "wled", "WLED", "wled",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "WLED", {
+                { "Devices",    [this]() { /* TODO */ } },
+                { "Effects",    [this]() { /* TODO */ } },
+                { "Brightness", [this]() { /* TODO */ } },
+            });
+        }
+    });
 
   // ── Settings ──────────────────────────────────────────────
-  _loader.registerApp({ "settings", "Settings", "settings",
-                       [this](DisplayManager& d) -> IScreen*
-                       {
-                         return new SubMenuScreen(d, "Settings", {
-                                                                     {"System Stats", [this, &d]() {  _ui.pushScreen(new SystemStatsScreen(d));  }},
-                                                                     {"WiFi", [this, &d]() { /* _ui.pushScreen(new WiFiSettingsScreen(d)); */ }},
-                                                                     {"WebSocket", [this, &d]() { /* _ui.pushScreen(new WebSocketSettingsScreen(d)); */ }},
-                                                                     {"System Logs", [this, &d]() { /* _ui.pushScreen(new SystemLogsScreen(d)); */ }},
-                                                                 });
-                       } });
+  _loader.registerApp({
+        "settings", "Settings", "settings",
+        [this](DisplayManager& d) -> IScreen* {
+            return new SubMenuScreen(d, "Settings", {
+                { "System Stats", [this]() { _ui.pushScreen(new SystemStatsScreen(_display)); } },
+                { "WiFi",         [this]() { /* TODO */ } },
+                { "Display",      [this]() { /* TODO */ } },
+                { "About",        [this]() { /* TODO */ } },
+            });
+        }
+    });
 
   Serial.println(String("[Loader] ") + _loader.apps().size() + " apps registered");
 }
 
 
 // ============================================================
-//  _bootUI
+//  _bootUI  —  Read NVS boot pref
 // ============================================================
 
 void AshuraCore::_bootUI()
 {
   _homeScreen = new HomeScreen(_display, _companion);
   _ui.pushScreen(_homeScreen);
-  _ui.pushScreen(new SplashScreen(_display));
+
+  int bootIdx = constrain(AshuraPrefs::getBoot(), 0, VIBE_COUNT - 1);
+  _ui.pushScreen(new VibePlayerScreen(_display, ALL_VIBES[bootIdx].animation));
 }
 
 
@@ -342,7 +370,11 @@ void AshuraCore::_buildAppMenu()
 // ============================================================
 
 void AshuraCore::_launchScreenSaver() {
-  _ui.pushScreen(new PlasmaScreen(_display));
+    int idx = AshuraPrefs::getScreensaver();
+    idx     = constrain(idx, 0, VIBE_COUNT - 1);
+
+    const Animation* anim = ALL_VIBES[idx].animation;
+    _ui.pushScreen(new VibePlayerScreen(_display, anim));
 }
 
 

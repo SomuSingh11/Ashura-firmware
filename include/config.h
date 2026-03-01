@@ -3,13 +3,13 @@
 // ============================================
 // WiFi Configuration
 // ============================================
-#define WIFI_SSID "Akatsuki"
-#define WIFI_PASSWORD "coolkid11"
+#define WIFI_SSID "********"
+#define WIFI_PASSWORD "********"
 
 // ============================================
 // WebSocket Server Configuration
 // ============================================
-#define WS_SERVER_HOST "192.168.31.70"  
+#define WS_SERVER_HOST "192.168.31.224"  
 #define WS_SERVER_PORT 3000
 #define WS_SERVER_PATH "/ws"
 
@@ -17,7 +17,9 @@
 // Device Configuration
 // ============================================
 #define DEVICE_ID "esp32-core-01"
-#define DEVICE_NAME "Ashura Core ESP32"
+#define DEVICE_NAME "Ashura Core"
+#define FIRMWARE_VERSION "v1.0"
+#define DEVELOPED_BY "k4ge"
 
 // ============================================
 // OLED Display Configuration (SSD1306 128x64)
@@ -38,13 +40,16 @@
 #define UI_MAX_VISIBLE_ITEMS 4
 #define UI_HINT_PADDING 38
 
+#define SUBMENU_ITEM_HEIGHT 16
+#define SUBMENU_ITEMS_ON_SCREEN 4
+
 // ============================================
 // Timing Configuration
 // ============================================
 #define HEARTBEAT_INTERVAL 10000  // 10 seconds
 #define RECONNECT_DELAY 5000      // 5 seconds
 #define SCREEN_TIMEOUT 30000      // 30 seconds
-#define SCREENSAVER_TIMEOUT 20000 // 20 seconds
+#define SCREENSAVER_TIMEOUT 200000 // 200 seconds
 #define LASTMESSAGE_HOMESCREEN_TIMEOUT 10000 // 10 seconds
 #define BUTTON_DEBOUNCE_MS 30
 #define NTP_SYNC_INTERVAL 30000 // 30 seconds
