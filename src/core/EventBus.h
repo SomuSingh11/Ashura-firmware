@@ -3,35 +3,46 @@
 #include<functional>
 #include<vector>
 
+// ============================================================
+//  AppEvent  —  all system-wide events
+// ============================================================
 enum class AppEvent {
-    // WiFi Layer
+    // ── WiFi ──────────────────────────────────────────────────
     WifiConnected,
     WifiDisconnected,
 
-    // WebSocket Transport Layer
+    // ── WebSocket ─────────────────────────────────────────────
     WebSocketConnected,
     WebSocketDisconnected,
     WebSocketRegistered,
 
-    // Messaging
+    // ── Messaging ─────────────────────────────────────────────
     CommandReceived,
     NotificationReceived,
     SendMessage,          // for outgoing WebSocket messages
 
-    // Input
+    // ── Input ─────────────────────────────────────────────────
     ButtonUp,
     ButtonDown,
     ButtonSelect,
     ButtonBack,
 
-    // UI - Display
+    // ── UI ────────────────────────────────────────────────────
     DisplayNeedsUpdate,
     ScreensaverStart,
     ScreensaverStop,
 
-    // System
+    // ── System ────────────────────────────────────────────────
     SystemTick,   // published every loop(), used by games/animations
     SystemBoot,    // published at the end of init()
+
+    // ── Companion: Pomodoro ───────────────────────────────────
+    PomodoroStarted,        // session began     → companion goes FOCUSED
+    PomodoroCompleted,      // full session      → companion goes HAPPY
+    PomodoroAborted,        // user cancelled    → companion goes IDLE
+    PomodoroBreak,          // break started     → companion goes HAPPY
+    SpotifyPlaying,         // track is playing  → companion EXCITED
+    SpotifyPaused,          // paused / stopped  → companion back to IDLE
 };
 
 struct EventSubscription {

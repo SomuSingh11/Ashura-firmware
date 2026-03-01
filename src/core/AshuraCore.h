@@ -7,6 +7,7 @@
 #include "../services/DeviceService.h"
 #include "../core/Loader.h"
 #include "../ui/screens/HomeScreen.h"
+#include "../companion/MoodEngine.h"
 
 // ============================================================
 //  AshuraCore  —  Top-level OS kernel
@@ -77,6 +78,12 @@ class AshuraCore {
         MessageRouter       _router;
         DeviceService       _deviceService;
         Loader              _loader;
+
+        // ========================================================
+        // Companion Subsystems
+        // ========================================================
+        MoodEngine          _mood;
+        CompanionRenderer   _companion{_mood};
 
         // ========================================================
         // ASHURA CORE State
