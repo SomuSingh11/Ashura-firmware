@@ -18,6 +18,7 @@
 #include "../application/vibes/VibeRegistry.h"
 
 #include "../ui/screens/clockApp/ClockFaceScreen.h"
+#include "../ui/screens/games/SnakeGame.h"
 #include "../ui/screens/screenSaver/PlasmaScreen.h"
 #include "../ui/screens/settings/SystemStatsScreen.h"
 
@@ -152,7 +153,7 @@ void AshuraCore::_registerApps()
         "games", "Games", "games",
         [this](DisplayManager& d) -> IScreen* {
             return new SubMenuScreen(d, "Games", {
-                { "Snake",     [this]() {  } },
+                { "Snake",     [this]() { _ui.pushScreen(new SnakeGame(_display)); } },
             });
         }
     });
