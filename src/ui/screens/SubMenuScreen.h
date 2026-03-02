@@ -1,9 +1,8 @@
 #pragma once
 
 // ================================================================
-//  SubMenuScreen  —  Flipper submenu style, NO header
+//  SubMenuScreen
 //
-//  Exact Flipper submenu.c rendering, header removed.
 //  y_offset = 0 (was 16 with header), items_on_screen = 4.
 //
 //  128×64 layout — 4 items visible at once:
@@ -18,7 +17,7 @@
 //  │                                                ▐ scrollbar │
 //  └────────────────────────────────────────────────────────────┘
 //
-//  Exact Flipper values (no header variant):
+//  Values (no header variant):
 //    item_height      = 16px
 //    items_on_screen  = 4
 //    y_offset         = 0   (no header)
@@ -61,7 +60,7 @@ public:
     void setSelected(int index) {
         if (index >= 0 && index < (int)_items.size()) {
             _pos    = index;
-            _winPos = max(0, index - (_IOS - 1));
+            _winPos = max(0, index - (SUBMENU_ITEMS_ON_SCREEN - 1));
         }
     }
 
@@ -71,7 +70,7 @@ public:
             if (_pos < _winPos) _winPos = _pos;
         } else {
             _pos    = (int)_items.size() - 1;
-            _winPos = max(0, _pos - (_IOS - 1));
+            _winPos = max(0, _pos - (SUBMENU_ITEMS_ON_SCREEN - 1));
         }
         _dirty = true;
     }
@@ -79,8 +78,8 @@ public:
     void onButtonDown() override {
         if (_pos < (int)_items.size() - 1) {
             _pos++;
-            if (_pos - _winPos > _IOS - 2 &&
-                _winPos < (int)_items.size() - _IOS)
+            if (_pos - _winPos > SUBMENU_ITEMS_ON_SCREEN - 2 &&
+                _winPos < (int)_items.size() - SUBMENU_ITEMS_ON_SCREEN)
                 _winPos++;
         } else {
             _pos    = 0;
@@ -99,19 +98,19 @@ public:
 
         auto& u = _display.raw();
         u.clearBuffer();
-        u.setFont(u8g2_font_5x7_tr);   // exact Flipper FontSecondary
+        u.setFont(u8g2_font_5x7_tr);  
 
-        for (int i = 0; i < _IOS; i++) {
+        for (int i = 0; i < SUBMENU_ITEMS_ON_SCREEN; i++) {
             int idx = _winPos + i;
             if (idx >= (int)_items.size()) break;
 
-            int itemY = i * _ITEM_H;            // top of row (y_offset=0, no header)
-            int txtY  = itemY + _ITEM_H - 4;    // baseline = itemY + 12
+            int itemY = i * SUBMENU_ITEM_HEIGHT;            // top of row (y_offset=0, no header)
+            int txtY  = itemY + SUBMENU_ITEM_HEIGHT - 4;    // baseline = itemY + 12
 
             if (idx == _pos) {
-                // Filled rounded box — exact Flipper elements_slightly_rounded_box
+                // Filled rounded box
                 u.setDrawColor(1);
-                u.drawRBox(0, itemY + 1, 123, _ITEM_H - 2, 1);
+                u.drawRBox(0, itemY + 1, 123, SUBMENU_ITEM_HEIGHT - 2, 1);
                 // White text
                 u.setDrawColor(0);
                 u.setFontMode(1);
@@ -129,8 +128,6 @@ public:
     }
 
 private:
-    static constexpr int _ITEM_H = 16;   // exact Flipper item_height
-    static constexpr int _IOS    = 4;    // items_on_screen (no header → 4)
 
     void _drawScrollbar(int total, int pos, U8G2& u) {
         const int H = 64;

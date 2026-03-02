@@ -76,6 +76,11 @@ class UIManager {
             popScreen();
         };
 
+        void onLongPressUp() { if(currentScreen()) currentScreen()->onLongPressUp(); }
+        void onLongPressDown() { if(currentScreen()) currentScreen()->onLongPressDown(); }
+        void onLongPressSelect() { if(currentScreen()) currentScreen()->onLongPressSelect(); }
+        void onLongPressBack() { if(currentScreen()) currentScreen()->onLongPressBack(); };      
+
         size_t stackDepth() const { return _stack.size(); }
 
     private: 

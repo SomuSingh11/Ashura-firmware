@@ -36,6 +36,7 @@
 #define RECORD_DISPLAY      "display"
 #define RECORD_LOADER       "loader"
 #define RECORD_NOTIFICATION "notification"
+#define RECORD_WLED         "wled"
 // #define RECORD_POWER        "power"
 // #define RECORD_DIALOGS      "dialogs"
 // #define RECORD_STORAGE      "storage"

@@ -43,6 +43,10 @@
 #define SUBMENU_ITEM_HEIGHT 16
 #define SUBMENU_ITEMS_ON_SCREEN 4
 
+#define WLED_DEVICE_MENU_ITEM_HEIGHT 16
+#define WLED_DEVICE_MENU_ITEMS_ON_SCREEN 4
+#define WLED_DEVICE_MENU_START_Y 12
+
 // ============================================
 // Timing Configuration
 // ============================================
@@ -53,6 +57,7 @@
 #define LASTMESSAGE_HOMESCREEN_TIMEOUT 10000 // 10 seconds
 #define BUTTON_DEBOUNCE_MS 30
 #define NTP_SYNC_INTERVAL 30000 // 30 seconds
+#define LONG_PRESS_MS 1000 // 1 second
 
 // ============================================
 // Application Configuration
@@ -70,3 +75,9 @@
 // UTC offset (seconds)
 // ============================================
 #define UTC_OFFSET_SEC       (5 * 3600 + 30 * 60)   // IST +5:30
+
+// ============================================
+// WLED HTTP Configuration
+// ============================================
+#define WLED_HTTPCLIENT_TIMEOUT 3000
+#define WLED_MAX_DEVICES 8 

@@ -10,6 +10,7 @@
 #include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/SubMenuScreen.h"
 #include "../ui/screens/bootScreen/SplashScreen.h"
+#include "../ui/screens/wled/WledDeviceScreen.h"
 
 // ── Vibe system ───────────────────────────────────────────────
 #include "../ui/screens/vibes/VibePickerScreen.h"
@@ -55,6 +56,10 @@ void AshuraCore::init()
   // ── 5. Mood Engine & Companion ──────────────────────────────────
   _mood.init();
   _companion.begin();
+
+  // ── 6. Wled ─────────────────────────────────────────────────────
+  _wled.begin();
+  record_create(RECORD_WLED, &_wled);
 
   // ── 6. Boot UI Sequence ─────────────────────────────────────────
   _bootUI();
@@ -115,14 +120,10 @@ void AshuraCore::update(){
   // ── Physical Buttons ────────────────────────────────────────
   bool anyPressed = false;
 
-  if (_readButton(PIN_BUTTON_UP, _btnUp))
-    _ui.onButtonUp();
-  if (_readButton(PIN_BUTTON_DOWN, _btnDown))
-    _ui.onButtonDown();
-  if (_readButton(PIN_BUTTON_SELECT, _btnSelect))
-    _ui.onButtonSelect();
-  if (_readButton(PIN_BUTTON_BACK, _btnBack))
-    _ui.onButtonBack();
+  _pollButton(PIN_BUTTON_UP,_btnUp,[this]{ _ui.onButtonUp(); }, [this]{ _ui.onLongPressUp();  }, anyPressed);
+  _pollButton(PIN_BUTTON_DOWN, _btnDown, [this]{ _ui.onButtonDown(); }, [this]{ _ui.onLongPressDown(); }, anyPressed);
+  _pollButton(PIN_BUTTON_SELECT, _btnSelect, [this]{ _ui.onButtonSelect(); }, [this]{ _ui.onLongPressSelect();}, anyPressed);
+  _pollButton(PIN_BUTTON_BACK, _btnBack, [this]{ _ui.onButtonBack(); }, [this]{ _ui.onLongPressBack();}, anyPressed);
 
   // ── Notify mood engine — resets idle timer, wakes from bored/sleepy ───────────────
   if (anyPressed)
@@ -206,11 +207,7 @@ void AshuraCore::_registerApps()
   _loader.registerApp({
         "wled", "WLED", "wled",
         [this](DisplayManager& d) -> IScreen* {
-            return new SubMenuScreen(d, "WLED", {
-                { "Devices",    [this]() { /* TODO */ } },
-                { "Effects",    [this]() { /* TODO */ } },
-                { "Brightness", [this]() { /* TODO */ } },
-            });
+          return new WledDeviceScreen(d, _ui, _wled);
         }
     });
 
@@ -399,4 +396,52 @@ bool AshuraCore::_readButton(int pin, BtnState& btn)
     }
   }
   return false;
+}
+
+// ============================================================
+//  _pollButton  —  Full press/long-press/release handler
+//
+//  onShortPress fires on RELEASE if held < LONG_PRESS_MS
+//  onLongPress  fires ONCE after LONG_PRESS_MS while held
+//  anyPressed   set true on any event (for mood interaction)
+// ============================================================
+
+void AshuraCore::_pollButton(int pin, BtnState& btn,
+                              std::function<void()> onShortPress,
+                              std::function<void()> onLongPress,
+                              bool& anyPressed)
+{
+    bool raw = digitalRead(pin);
+
+    // Debounce
+    if (raw != btn.lastRaw) btn.lastDebounce = millis();
+    btn.lastRaw = raw;
+    if ((millis() - btn.lastDebounce) <= BUTTON_DEBOUNCE_MS) return;
+
+    bool isPressed = (raw == LOW);
+
+    if (isPressed && btn.state == HIGH) {
+        // Button just went down
+        btn.state      = LOW;
+        btn.pressStart = millis();
+        btn.longFired  = false;
+
+    } else if (isPressed && btn.state == LOW) {
+        // Button held — check for long press
+        if (!btn.longFired &&
+            (millis() - btn.pressStart) >= LONG_PRESS_MS) {
+            btn.longFired = true;
+            onLongPress();
+            anyPressed = true;
+        }
+
+    } else if (!isPressed && btn.state == LOW) {
+        // Button released
+        btn.state = HIGH;
+        if (!btn.longFired) {
+            // Short press — fire on release
+            onShortPress();
+            anyPressed = true;
+        }
+    }
 }
