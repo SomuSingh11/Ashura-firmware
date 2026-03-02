@@ -8,6 +8,7 @@
 #include "../core/Loader.h"
 #include "../ui/screens/HomeScreen.h"
 #include "../companion/MoodEngine.h"
+#include "../application/wled/WledManager.h"
 
 // ============================================================
 //  AshuraCore  —  Top-level OS kernel
@@ -48,6 +49,8 @@ class AshuraCore {
             bool            lastRaw         = HIGH; // Last raw reading from pin
             bool            state           = HIGH; // Debounced state
             unsigned long   lastDebounce    = 0;    // Timestamp of last state change for debounce
+            unsigned long   pressStart       = 0;    // Timestamp when button was pressed (for long press)
+            bool            longFired        = false; // Whether long press action has been fired
         };
 
     private:
@@ -67,6 +70,7 @@ class AshuraCore {
         void _buildAppMenu();
         void _launchScreenSaver();
         bool _readButton(int pin, BtnState& state);
+        void _pollButton(int pin, BtnState& state, std::function<void()> onShortPress, std::function<void()> onLongPress, bool& anyPressed);
 
         // ========================================================
         // Services (owned by OS, registered in AshuraRecord)
@@ -78,6 +82,7 @@ class AshuraCore {
         MessageRouter       _router;
         DeviceService       _deviceService;
         Loader              _loader;
+        WledManager         _wled; 
 
         // ========================================================
         // Companion Subsystems

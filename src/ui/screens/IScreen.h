@@ -32,6 +32,11 @@ class IScreen {
         virtual void onButtonSelect()  {}
         virtual void onButtonBack()    {}
 
+        virtual void onLongPressUp()     {}
+        virtual void onLongPressDown()   {}
+        virtual void onLongPressSelect() {}
+        virtual void onLongPressBack()   {}
+
         // Return true for games/animations that need update() every loop tick
         virtual bool needsContinuousUpdate() const { return false; }
         // Return true for screens that want to be popped (animation that self-closes, etc)
