@@ -5,6 +5,14 @@
 // ============================================
 #define WIFI_SSID "********"
 #define WIFI_PASSWORD "********"
+namespace Config {
+    namespace WiFi {
+        static constexpr int MAX_ATTEMPTS = 8;
+        static constexpr unsigned long BACKOFF_BASE = 2000UL;
+        static constexpr unsigned long BACKOFF_CAP = 60000UL;
+        static constexpr unsigned long CONNECT_TIMEOUT = 8000UL;
+    }
+}
 
 // ============================================
 // WebSocket Server Configuration
