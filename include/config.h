@@ -81,3 +81,8 @@
 // ============================================
 #define WLED_HTTPCLIENT_TIMEOUT 3000
 #define WLED_MAX_DEVICES 8 
+
+// ============================================
+// Notification Configuration
+// ============================================
+#define MAX_NOTIFICATION_BUFFER 10
