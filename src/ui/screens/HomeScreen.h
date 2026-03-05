@@ -1,15 +1,15 @@
 #pragma once
 
-#include <Arduino.h>
-#include <WiFi.h>
-#include <time.h>
-
-#include "IScreen.h"
 #include "config.h"
+#include <Arduino.h>
+#include <time.h>
+#include "IScreen.h"
 
-#include "../../companion/CompanionRenderer.h"
 #include "../../core/DisplayManager.h"
 #include "../../core/TimeManager.h"
+#include "../../core/NotificationManager.h"
+#include "../../companion/CompanionRenderer.h"
+
 
 // ================================================================
 //  HomeScreen  —  Ashura OS Desktop
@@ -17,158 +17,210 @@
 //  128×64 layout:
 //
 //  ┌──────────────────────────────────────────────────────────────┐
-//  │                                           Mon 23 Jan    [*] │  y=8
-//  │                                                             │
-//  │                                           14:32             │  y=28
-//  │                                           :45               │  y=38
-//  │                                           ████████████████  │  seconds bar y=45
-//  │  ╭──╮   ╭──╮                                               │
-//  │  │● │   │ ●│    ←  companion eyes  48×26  bottom-left      │
-//  │  ╰──╯   ╰──╯                                               │
+//  │  Wed 05 Jan                    14:32              y=8        │
+//  │                                  :45  ▓▓▓▓▓▓     y=18-20   │
+//  │                                                              │
+//  │  ╭──╮  ╭──╮                                                 │
+//  │  │  │  │  │   companion eyes  x=0 y=28 w=56 h=26           │
+//  │  ╰──╯  ╰──╯                                                 │
+//  ├──────────────────────────────────────────────────────────────┤  y=53
+//  │  · notification ticker ·            [● *]  ②    y=63        │
 //  └──────────────────────────────────────────────────────────────┘
 //
-//  Companion region: x=0 y=38 w=56 h=26
-//  Clock region:     right half  x=62
-//  Date + badge:     top-right   y=8
+//  Status bar (y=54..63):
+//    Left  — notification ticker (scrolls if long, fades after timeout)
+//    Right — compound badge [WiFi WS] + unread dot
+//
+//  Badge symbols:
+//    WiFi:  · idle   o trying   * connected   ! failed
+//    WS:    - idle   o trying   ~ connected   * registered   ! failed
 //
 //  SELECT / DOWN → wantsMenu()
 //  Idle > SCREENSAVER_TIMEOUT → wantsScreenSaver()
 // ================================================================
 
-static const char* const _dayName[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+static const char* const _dayName[] = { 
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
 static const char* const _monthName[] = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-     "Jul","Aug", "Sep", "Oct", "Nov", "Dec"
+    "Jul","Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
 class HomeScreen : public IScreen {
     public:
-        explicit HomeScreen(DisplayManager& display, CompanionRenderer& companion) : _display(display), _companion(companion) {};
+        explicit HomeScreen(DisplayManager& display, CompanionRenderer& companion) 
+            : _display(display), _companion(companion) {};
 
         void onEnter() override {
             _lastInteraction    = millis();
-            _dirty              = true;
+            _tickerOffset       = 0;
+            _lastTickerScroll   = millis();
         }
 
         bool needsContinuousUpdate() const override { return true; }
 
-        // ── Called by AshuraCore event wires ────────────────────
-        void setConnectionStatus(const String& s){
-            _connectionStatus = s;
-        }
+        // ── Called by AshuraCore ──────────────────────────────────
+        void setConnectionStatus(const String& s){ _connectionStatus = s; }
         void setLastMessage(const String& msg){
             _lastMessage = msg;
             _lastMessageAt = millis();
+            _tickerOffset = 0;                  // reset scroll to start on new message
         }
 
         // ── Signals polled by AshuraCore ─────────────────────────
         bool wantsMenu(){
-            if(_wantsMenu) {
-                _wantsMenu = false;
-                return true;
-            }
+            if(_wantsMenu) { _wantsMenu = false; return true; }
             return false;
         }
         bool wantsScreenSaver(){
-            if(_wantsScreensaver){
-                _wantsScreensaver = false;
-                return true;
-            }
+            if(_wantsScreensaver){ _wantsScreensaver = false; return true; }
             return false;
         }
 
         // ── Buttons ──────────────────────────────────────────────
-        void onButtonSelect() override {
-            _lastInteraction = millis();
-            _wantsMenu = true;
-        }
-        void onButtonDown() override {
-            _lastInteraction = millis();
-            _wantsMenu = true;
-        }
-        void onButtonUp() override {
-            _lastInteraction = millis();
-        }
-        void onButtonBack() override {
-            _lastInteraction = millis();
-        }
+        void onButtonSelect() override  { _lastInteraction = millis(); _wantsMenu = true; }
+        void onButtonDown()   override  { _lastInteraction = millis(); _wantsMenu = true; }
+        void onButtonUp()     override  { _lastInteraction = millis(); }
+        void onButtonBack()   override  { _lastInteraction = millis(); }
 
+        
         // ── Render ───────────────────────────────────────────────
         void update() override {
             unsigned long now = millis();
 
-            // ScreenSaver trigger
-            if(now - _lastInteraction > SCREENSAVER_TIMEOUT){
-                _wantsScreensaver   = true;
-                _lastInteraction    = now;
-            }
+            // 1. Screensaver trigger
+            if(now - _lastInteraction > SCREENSAVER_TIMEOUT){ _wantsScreensaver = true; _lastInteraction = now; }
 
-            // Always redraw - companion animates continuously
-            auto& u = _display.raw(); //U8G2 object
+            // 2. Trigger Scroll - advance every 200 ms if message is too long
+            if(!_lastMessage.isEmpty() &&
+                now - _lastMessageAt < (unsigned long) LASTMESSAGE_HOMESCREEN_TIMEOUT &&
+                _lastMessage.length() > TICKER_MAX_CHARS &&
+                now - _lastTickerScroll > TICKER_SCROLL_MS ) 
+                {
+                    _lastTickerScroll = now;
+                    _tickerOffset++;
+                    if(_tickerOffset > (int)_lastMessage.length()) _tickerOffset = 0;
+                }
+
+            auto& u = _display.raw();
             u.clearBuffer();
-            
-            // ── Companion eyes — bottom-left 56×26 ───────────────
-            // Region: x=0, y=38, w=56, h=26
-            _companion.draw(u, 0, 38, 56, 26);
 
-            // ── Date line (top-right, y=8) ────────────────────────
+            // ── Companion eyes — left side, vertically centred ────
+            _companion.draw(u, 0, 28, 56, 26);
+
             u.setFont(u8g2_font_5x7_tr);
-            if(Time().isSynced()){
+
+            // ── Date (top-left) ───────────────────────────────────
+            if (Time().isSynced()) {
                 struct tm t;
-                if(getLocalTime(&t, 0)){
+                if (getLocalTime(&t, 0)) {
                     char buf[14];
-                    sniprintf(buf,  sizeof(buf), "%s %02d %s",
-                        _dayName[t.tm_wday],t.tm_mday, _monthName[t.tm_mon]);
-                    u.drawStr(62, 8, buf);
+                    snprintf(buf, sizeof(buf), "%s %02d %s",
+                        _dayName[t.tm_wday], t.tm_mday, _monthName[t.tm_mon]);
+                    u.drawStr(0, 8, buf);
                 }
             } else {
-                u.drawStr(62, 8, "Syncing...");
+                u.drawStr(0, 8, "Syncing...");
             }
 
-            // ── Connection badge (top-right corner) ──────────────
-            bool online = _connectionStatus == "[ * ]";
-            u.drawStr(121, 8, online ? "*" : "-");
-
-            // ── HH:MM (large, right half) ─────────────────────────
-            u.setFont(u8g2_font_ncenB08_tr);
+            // ── HH:MM (top-right, large) ──────────────────────────
+            u.setFont(u8g2_font_ncenB14_tr);
             char timeBuf[6];
-            sniprintf(timeBuf, sizeof(timeBuf), "%02d:%02d",
-               Time().getHH(), Time().getMM());
-            u.drawStr(62, 32,timeBuf); 
+            snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d",
+                    Time().getHH(), Time().getMM());
+            // Right-align: measure width, pin to x=127
+            int tw = u.getStrWidth(timeBuf);
+            u.drawStr(127 - tw, 16, timeBuf);
 
-            // ── Seconds ───────────────────────────────────────────
+            // ── Seconds + progress bar (below time) ───────────────
             u.setFont(u8g2_font_5x7_tr);
             char secBuf[4];
             snprintf(secBuf, sizeof(secBuf), ":%02d", Time().getSS());
-            u.drawStr(62, 42, secBuf);
+            int sw = u.getStrWidth(secBuf);
+            u.drawStr(127 - sw, 24, secBuf);
 
-            // ── Seconds progress bar ──────────────────────────────
-            int barW = (Time().getSS() * 60) / 60;
-            u.drawBox(62, 45, barW, 2);
+            // Seconds bar — right-aligned, 40px wide
+            int barFill = (Time().getSS() * 40) / 60;
+            u.drawFrame(87, 26, 40, 2);
+            if (barFill > 0) u.drawBox(87, 26, barFill, 2);
 
-            // ── Last notification (bottom strip, fades after timeout)
-            if (!_lastMessage.isEmpty() &&
-                now - _lastMessageAt < (unsigned long)LASTMESSAGE_HOMESCREEN_TIMEOUT)
-            {
-                u.setFont(u8g2_font_5x7_tr);
-                String m = _lastMessage;
-                if (m.length() > 21) m = m.substring(0, 18) + "...";
-                u.drawStr(0, 63, m.c_str());
-            }
+            // ── Divider above status bar ──────────────────────────
+            u.drawLine(0, 53, 127, 53);
+
+            // ── Status bar ────────────────────────────────────────
+            _drawStatusBar(u, now);
 
             u.sendBuffer();
-            _dirty = false;
         }
         
     
     private:
-        DisplayManager&     _display;
-        CompanionRenderer&   _companion;
+        // ── Status bar constants ──────────────────────────────────
+        static constexpr int  TICKER_MAX_CHARS = 18;
+        static constexpr int  TICKER_SCROLL_MS = 200;
+        static constexpr int  STATUS_Y         = 63;   // text baseline
+        static constexpr int  BADGE_X          = 95;   // badge left edge
 
-        String              _connectionStatus  = "[ - ]";
+        void _drawStatusBar(U8G2& u, unsigned long now) {
+            u.setFont(u8g2_font_5x7_tr);
+
+            // ── Badge (right side) ────────────────────────────────
+            // _connStatus is "[w s]" format from AshuraCore::_updateBadge()
+            int bw = u.getStrWidth(_connectionStatus.c_str());
+            u.drawStr(127 - bw, STATUS_Y, _connectionStatus.c_str());
+
+            // ── Unread dot + count ────────────────────────────────
+            int unread = NotifMgr().unreadCount();
+            if (unread > 0) {
+                char dot[4];
+                snprintf(dot, sizeof(dot), "%d", min(unread, 9));
+                // Small filled circle + count just left of badge
+                u.drawDisc(BADGE_X - 6, STATUS_Y - 3, 3);
+                u.setDrawColor(0);
+                u.drawStr(BADGE_X - 8, STATUS_Y, dot);
+                u.setDrawColor(1);
+            }
+
+            // ── Notification ticker (left + centre) ───────────────
+            bool msgActive = !_lastMessage.isEmpty() &&
+                            now - _lastMessageAt < (unsigned long)LASTMESSAGE_HOMESCREEN_TIMEOUT;
+
+            if (msgActive) {
+                // Scroll window into message
+                String visible;
+                int len = _lastMessage.length();
+                if (len <= TICKER_MAX_CHARS) {
+                    visible = _lastMessage;
+                } else {
+                    int start = _tickerOffset % len;
+                    // Wrap-around substring
+                    if (start + TICKER_MAX_CHARS <= len) {
+                        visible = _lastMessage.substring(start, start + TICKER_MAX_CHARS);
+                    } else {
+                        visible = _lastMessage.substring(start) +
+                                " " +
+                                _lastMessage.substring(0, TICKER_MAX_CHARS -
+                                                        (len - start) - 1);
+                    }
+                }
+                u.drawStr(0, STATUS_Y, visible.c_str());
+            } else {
+                // No active message — show subtle idle hint
+                u.drawStr(0, STATUS_Y, "Ashura OS");
+            }
+        }
+
+        // ── Members ───────────────────────────────────────────────
+        DisplayManager&     _display;
+        CompanionRenderer&  _companion;
+
+        String              _connectionStatus   = "[- -]";
         String              _lastMessage;
-        unsigned            _lastMessageAt   = 0;
-        unsigned            _lastInteraction   = 0;
-        bool                _wantsMenu         = false;
-        bool                _wantsScreensaver  = false;
+        unsigned long       _lastMessageAt      = 0;
+        unsigned long       _lastInteraction    = 0;
+        unsigned long       _lastTickerScroll   = 0;
+        int                 _tickerOffset       = 0;
+        bool                _wantsMenu          = false;
+        bool                _wantsScreensaver   = false;
 };

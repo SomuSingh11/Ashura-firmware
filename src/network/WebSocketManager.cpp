@@ -41,7 +41,7 @@ void WebSocketManager::update() {
             }
             break;
 
-        case WebSocketState::CONNECTING:
+        case WebSocketState::CONNECTING: {
             unsigned long now = millis();
 
             // 1. Sitting out backoff delay
@@ -72,7 +72,7 @@ void WebSocketManager::update() {
                            "/" + String(Config::WebSocket::MAX_ATTEMPTS));
             _beginConnect();
             break;
-
+        }
 
         // ── Socket open, waiting for registration ──────────────
         case WebSocketState::CONNECTED:
