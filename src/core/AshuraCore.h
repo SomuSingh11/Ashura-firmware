@@ -1,11 +1,17 @@
 #pragma once
+#include <functional>
 #include "WiFiManager.h"
+#include "NotificationManager.h"
+
 #include "../network/WebSocketManager.h"
 #include "../network/MessageRouter.h"
+
 #include "../core/UIManager.h"
 #include "../core/DisplayManager.h"
-#include "../services/DeviceService.h"
 #include "../core/Loader.h"
+
+#include "../services/DeviceService.h"
+
 #include "../ui/screens/HomeScreen.h"
 #include "../companion/MoodEngine.h"
 #include "../application/wled/WledManager.h"
@@ -22,19 +28,16 @@
 //    6.  Push boot screens (Splash → Home)
 //    7.  Wire EventBus subscriptions
 //    8.  Button GPIO init
-//    9.  WiFi service     → record_create(RECORD_WIFI)
-//    10. NTP sync
-//    11. WebSocket service→ record_create(RECORD_WEBSOCKET)
-//    12. Register MessageRouter services
-//    13. WebSocket connect
+//    9.  WiFi + NTP + WebSocket init
 //
 //  Update loop (mirrors Flipper's OS tick):
 //    - WiFi watchdog
 //    - NTP retry
 //    - WebSocket poll
-//    - UI tick (ViewDispatcher / UIManager)
+//    - Companion update (mood decay, lerp, blink)
+//    - UI tick
 //    - HomeScreen signals
-//    - Physical button debounce
+//    - Physical button debounce → onInteraction()
 // ============================================================
 
 class AshuraCore {
@@ -46,18 +49,18 @@ class AshuraCore {
         // Button Debounce State
         // ======================================================== 
         struct BtnState {
-            bool            lastRaw         = HIGH; // Last raw reading from pin
-            bool            state           = HIGH; // Debounced state
-            unsigned long   lastDebounce    = 0;    // Timestamp of last state change for debounce
-            unsigned long   pressStart       = 0;    // Timestamp when button was pressed (for long press)
-            bool            longFired        = false; // Whether long press action has been fired
+            bool            lastRaw         = HIGH;     // Last raw reading from pin
+            bool            state           = HIGH;     // Debounced state
+            unsigned long   lastDebounce    = 0;        // Timestamp of last state change for debounce
+            unsigned long   pressStart      = 0;        // Timestamp when button was pressed (for long press)
+            bool            longFired       = false;    // Whether long press action has been fired
         };
 
     private:
         // ========================================================
         // Boot Helpers
         // ========================================================
-        void _initServices();
+        //void _initServices();
         void _registerApps();
         void _bootUI();
         void _wireEvents();
@@ -67,6 +70,8 @@ class AshuraCore {
         // ========================================================
         // Runtime Helpers
         // ========================================================
+        void _updateNetwork(unsigned long now);;    // coordinates WiFi + WS
+        void _updateBadge();
         void _buildAppMenu();
         void _launchScreenSaver();
         bool _readButton(int pin, BtnState& state);
@@ -87,15 +92,16 @@ class AshuraCore {
         // ========================================================
         // Companion Subsystems
         // ========================================================
-        MoodEngine          _mood;
-        CompanionRenderer   _companion{_mood};
+        MoodEngine          _mood;                                  // tracks emotional state
+        CompanionRenderer   _companion{_mood};                      // renders eyes from mood
 
         // ========================================================
         // ASHURA CORE State
         // ========================================================
         HomeScreen*     _homeScreen         = nullptr;
-        String          _wsStatus           = "Offline";
-        bool            _networkInitDone    = false;
+        NetState        _prevNetState       = NetState::IDLE;       // last known WiFi state
+        WebSocketState  _prevWsState        = WebSocketState::IDLE; // last known WS state
+        unsigned long   _lastNtpSync        = false;
 
         // ========================================================
         // Button States

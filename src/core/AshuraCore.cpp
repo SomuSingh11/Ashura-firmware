@@ -10,7 +10,11 @@
 #include "../ui/screens/AppMenuScreen.h"
 #include "../ui/screens/SubMenuScreen.h"
 #include "../ui/screens/bootScreen/SplashScreen.h"
+
+// ── Apps ──────────────────────────────────────────────────────
 #include "../ui/screens/wled/WledDeviceScreen.h"
+#include "../ui/screens/clockApp/ClockFaceScreen.h"
+#include "../ui/screens/settings/SystemStatsScreen.h"
 
 // ── Vibe system ───────────────────────────────────────────────
 #include "../ui/screens/vibes/VibePickerScreen.h"
@@ -18,11 +22,8 @@
 #include "../ui/screens/vibes/VibePlayerScreen.h"
 #include "../application/vibes/VibeRegistry.h"
 
-#include "../ui/screens/clockApp/ClockFaceScreen.h"
-#include "../ui/screens/screenSaver/PlasmaScreen.h"
-#include "../ui/screens/settings/SystemStatsScreen.h"
-
 #include <vector>
+
 
 // ============================================================
 //  AshuraOS::init  —  Full system boot
@@ -61,20 +62,21 @@ void AshuraCore::init()
   _wled.begin();
   record_create(RECORD_WLED, &_wled);
 
-  // ── 6. Boot UI Sequence ─────────────────────────────────────────
+  // ── 7. Boot UI Sequence ─────────────────────────────────────────
   _bootUI();
 
-  // ── 7. EventBus Wiring ──────────────────────────────────────────
+  // ── 8. EventBus Wiring ──────────────────────────────────────────
   _wireEvents();
 
-  // ── 8. Button Initialization ────────────────────────────────────
+  // ── 10. Button Initialization ────────────────────────────────────
   _initButtons();
 
-  // ── 9. Network & WebSocket Initialization ───────────────────────
+  // ── 11. Network & WebSocket Initialization ───────────────────────
   _initNetwork();
 
   Serial.println("[AshuraCore] ✅ Boot complete");
 }
+
 
 // ============================================================
 //  AshuraCore::update  —  Main OS tick (called from loop())
@@ -83,23 +85,7 @@ void AshuraCore::init()
 void AshuraCore::update(){
   unsigned long now = millis();
   
-  // ── WiFi Watchdog ────────────────────────────────────────────
-  _wifi.update();
-
-  // ── NTP Retry / Time Sync ───────────────────────────────────
-  Time().update();
-  if (_wifi.isConnected() && !Time().isSynced())
-  {
-    static unsigned long _lastNtp = 0;
-    if (millis() - _lastNtp > NTP_SYNC_INTERVAL)
-    {
-      _lastNtp = millis();
-      Time().sync();
-    }
-  }
-
-  // ── WebSocket Poll ───────────────────────────────────────────
-  _websocket.update();
+  _updateNetwork(now);
 
   // ── Companion Systems (Mood Update — mood decay + lerp + blink + micro) ──────────
   _mood.update(now);
@@ -109,12 +95,9 @@ void AshuraCore::update(){
   _ui.update();
 
   // ── HomeScreen Signals ──────────────────────────────────────
-  if (_ui.currentScreen() == _homeScreen)
-  {
-    if (_homeScreen->wantsMenu())
-      _buildAppMenu();
-    if (_homeScreen->wantsScreenSaver())
-      _launchScreenSaver();
+  if (_ui.currentScreen() == _homeScreen) {
+    if(_homeScreen->wantsMenu())        _buildAppMenu();
+    if(_homeScreen->wantsScreenSaver()) _launchScreenSaver();
   }
 
   // ── Physical Buttons ────────────────────────────────────────
@@ -126,9 +109,9 @@ void AshuraCore::update(){
   _pollButton(PIN_BUTTON_BACK, _btnBack, [this]{ _ui.onButtonBack(); }, [this]{ _ui.onLongPressBack();}, anyPressed);
 
   // ── Notify mood engine — resets idle timer, wakes from bored/sleepy ───────────────
-  if (anyPressed)
-    _mood.onInteraction();
+  if (anyPressed) _mood.onInteraction();
 }
+
 
 // ============================================================
 //  Private — boot helpers
@@ -183,7 +166,7 @@ void AshuraCore::_registerApps()
                     _ui.pushScreen(new VibePickerScreen(
                         _display, _ui, 1, AshuraPrefs::getBoot()));
                 }},
-                { "Home Screen", [this]() {
+                { "TODO: Home Screen", [this]() {
                     _ui.pushScreen(new VibePickerScreen(
                         _display, _ui, 2, AshuraPrefs::getHomeScreen()));
                 }},
@@ -229,7 +212,7 @@ void AshuraCore::_registerApps()
 
 
 // ============================================================
-//  _bootUI  —  Read NVS boot pref
+//  _bootUI  —  Read NVS boot pref, push BootScreen
 // ============================================================
 
 void AshuraCore::_bootUI()
@@ -238,13 +221,149 @@ void AshuraCore::_bootUI()
   _ui.pushScreen(_homeScreen);
 
   int bootIdx = constrain(AshuraPrefs::getBoot(), 0, VIBE_COUNT - 1);
-  _ui.pushScreen(new VibePlayerScreen(_display, ALL_VIBES[bootIdx].animation));
+  Serial.println("[Boot] bootIdx = " + String(bootIdx) + " / " + ALL_VIBES[bootIdx].name);
+
+  const Animation* bootAnimation = ALL_VIBES[bootIdx].animation;
+
+  if(bootAnimation == nullptr){
+    Serial.println("[Boot] Using SplashScreen");
+    _ui.pushScreen(new SplashScreen(_display));
+  } else {
+    Serial.println("[Boot] Using VibePlayerScreen: " + String(bootAnimation->name));
+    _ui.pushScreen(new VibePlayerScreen(_display, bootAnimation));
+  }
 }
+
+
+// ============================================================
+//  _launchScreenSaver —  Read NVS screensaver pref, push VibePlayerScreen
+// ============================================================
+
+void AshuraCore::_launchScreenSaver() {
+    int idx = AshuraPrefs::getScreensaver();
+    idx     = constrain(idx, 0, VIBE_COUNT - 1);
+
+    const Animation* anim = ALL_VIBES[idx].animation;
+    _ui.pushScreen(new VibePlayerScreen(_display, anim));
+}
+
 
 
 // ============================================================
 //  _wireEvents
 // ============================================================
+
+// ============================================================
+//  _updateNetwork
+//
+//  Coordinates WiFi + WebSocket with a simple state machine:
+//
+//  WiFi down  → only run WiFiManager (handles reconnect internally)
+//               WebSocket is NOT polled — pointless without WiFi
+//
+//  WiFi restored → immediately trigger WS connect + NTP sync
+//
+//  WiFi up    → poll WebSocket normally (handles its own reconnect)
+//
+//  WiFi lost  → stop polling WebSocket, update home screen badge
+// ============================================================
+
+void AshuraCore::_updateNetwork(unsigned long now){
+  NetState        prevNet   = _wifi.state();
+  WebSocketState  prevWs    = _websocket.webSocketState();
+
+  // ── 1. Always tick WiFiManager ────────────────────────────
+    _wifi.update();
+
+  // ── 2. React to WiFi state transitions ────────────────────
+  NetState curNet = _wifi.state();
+
+  if(prevNet != NetState::CONNECTED && curNet == NetState::CONNECTED) {
+    // WiFi just came up — sync NTP, let WS state machine take over
+    Serial.println("[Net] WiFi connected → NTP sync");
+    Time().sync();
+    _lastNtpSync = now;
+  }
+
+  if(prevNet == NetState::CONNECTED && curNet != NetState::CONNECTED) {
+    // WiFi just dropped — reset WebSocket cleanly
+    Serial.println("[Net] WiFi lost → resetting WebSocket");
+    _websocket.resetForWifi(); 
+  }
+
+  // ── 3. Tick WebSocket only when WiFi is up ────────────────
+  if (curNet == NetState::CONNECTED) {
+    _websocket.update();
+  }
+
+  // ── 4. NTP re-sync on interval ────────────────────────────
+  if (curNet == NetState::CONNECTED &&
+    now - _lastNtpSync > NTP_SYNC_INTERVAL &&
+    !Time().isSynced()) {
+    _lastNtpSync = now;
+    Time().sync();
+  }
+
+  // ── 5. Always tick TimeManager ────────────────────────────
+  Time().update();
+
+  // ── 6. Update badge if either state changed ───────────────
+  if (_wifi.state() != _prevNetState || _websocket.webSocketState() != _prevWsState) {
+    _prevNetState = _wifi.state();
+    _prevWsState  = _websocket.webSocketState();
+    _updateBadge();
+  }
+}
+
+
+// ============================================================
+//  _updateBadge
+//
+//  Computes compound [WiFi WS] badge from both state machines.
+//  Called whenever either state changes — not every tick.
+//
+//  WiFi symbols:   · idle   ○ connecting/lost   ● connected   ! failed
+//  WS symbols:     - idle   ~ connected         * registered  ! failed
+// ============================================================
+
+void AshuraCore::_updateBadge() {
+  // ── WiFi symbol ───────────────────────────────────────────
+  char wSym;
+  switch (_wifi.state()) {
+        case NetState::CONNECTED:            wSym = '*'; break;  // filled
+
+        case NetState::CONNECTING:
+        case NetState::LOST:                 wSym = 'o'; break;  // trying
+
+        case NetState::FAILED:               wSym = '!'; break;  // gave up
+
+        case NetState::IDLE:
+        default:                             wSym = '-'; break;  // no creds
+    }
+  
+  // ── WebSocket symbol ──────────────────────────────────────
+  char wsSym;
+  switch (_websocket.webSocketState()) {
+        case WebSocketState::REGISTERED:            wsSym = '*'; break;
+        case WebSocketState::CONNECTED:             wsSym = '~'; break;
+        case WebSocketState::CONNECTING:            wsSym = 'o'; break;
+        case WebSocketState::FAILED:                wsSym = '!'; break;
+        case WebSocketState::IDLE:
+        default:                             wsSym = '-'; break;
+  }
+
+  char badge[8];
+  snprintf(badge, sizeof(badge), "[%c %c]", wSym, wsSym);
+
+  if (_homeScreen) _homeScreen->setConnectionStatus(badge);
+
+  Serial.printf("[Badge] %s  WiFi:%d  WS:%d\n",
+                  badge,
+                  (int)_wifi.state(),
+                  (int)_websocket.webSocketState());
+}
+
+
 
 void AshuraCore::_wireEvents()
 {
@@ -254,20 +373,30 @@ void AshuraCore::_wireEvents()
   });
   Bus().subscribe(AppEvent::WifiDisconnected, [this](){
     Serial.println("[Core] WiFi ❌");
-    if (_homeScreen) _homeScreen->setConnectionStatus("[ - ]"); 
   });
+  Bus().subscribe(AppEvent::WifiFailed, [this]() {
+    Serial.println("[Core] WiFi FAILED");
+    // Notification already pushed by WiFiManager
+    // MoodEngine → ANNOYED (brief)
+  });
+  Bus().subscribe(AppEvent::WifiIdle, [this]() {
+     Serial.println("[Core] WiFi IDLE — credentials cleared");
+  });
+
 
   // ── WebSocket → HomeScreen Badge ─────────────────────────────
   Bus().subscribe(AppEvent::WebSocketConnected, [this](){
-    if (_homeScreen) _homeScreen->setConnectionStatus("[ ~ ]"); 
+    Serial.println("[Core] WS connected"); 
   });
   Bus().subscribe(AppEvent::WebSocketDisconnected, [this](){
-    _wsStatus = "Offline";
-    if (_homeScreen) _homeScreen->setConnectionStatus("[ - ]"); 
+    Serial.println("[Core] WS disconnected"); 
   });
   Bus().subscribe(AppEvent::WebSocketRegistered, [this](){
-    _wsStatus = "Active";
-    if (_homeScreen) _homeScreen->setConnectionStatus("[ * ]"); 
+    Serial.println("[Core] WS registered ✅");
+  });
+  Bus().subscribe(AppEvent::WebSocketFailed, [this]() {
+    Serial.println("[Core] WS FAILED");
+    // Notification already pushed by WebSocketManager
   });
 
 
@@ -276,15 +405,24 @@ void AshuraCore::_wireEvents()
     _router.route(json);
   });
 
+
   // ── Notifications → HomeScreen Ticker ───────────────────────
   // (MoodEngine also subscribed → SURPRISED flash)
   Bus().subscribe(AppEvent::NotificationReceived, [this](const String& payload){
     if (_homeScreen) _homeScreen->setLastMessage(payload); 
   });
 
+
   // ── Outgoing Messages → WebSocket ───────────────────────────
   Bus().subscribe(AppEvent::SendMessage, [this](const String& json){ 
-  _websocket.send(json);
+    _websocket.send(json);
+  });
+
+  // ── Notification badge dot ────────────────────────────────
+  Bus().subscribe(AppEvent::NotificationPushed, [this](const String& title) {
+    // HomeScreen reads Notifs().unreadCount() each frame
+    // so no explicit call needed — just log here
+    Serial.println("[Core] Notification: " + title);
   });
 }
 
@@ -310,22 +448,26 @@ void AshuraCore::_initNetwork()
 {
   // ── WiFi Service ─────────────────────────────────────────────
   record_create(RECORD_WIFI, &_wifi);
-  // WiFi (blocking connect with timeout in WiFiManager::init)
-  _wifi.init(WIFI_SSID, WIFI_PASSWORD);
+  _wifi.init(); // loads NVS creds, starts CONNECTING if found
 
   // ── Initial Time Sync ───────────────────────────────────────
-  if (_wifi.isConnected()) Time().sync();
+  if (_wifi.isConnected()){
+    Time().sync();
+    _lastNtpSync = millis();
+  }
 
   // ── WebSocket Service ───────────────────────────────────────
   record_create(RECORD_WEBSOCKET, &_websocket);
-  _websocket.init();
+  _websocket.init(); // loads NVS config, wires callbacks | state machine starts in IDLE — update() drives it
 
   // ── Message Routing Services ────────────────────────────────
   _router.registerService(&_deviceService);
 
-  // ── WebSocket Connection ────────────────────────────────────
-  // Non-blocking after this call
-  _websocket.connect();
+  // ── Seed state tracking ───────────────────────────────────
+    _prevNetState = _wifi.state();
+    _prevWsState  = _websocket.webSocketState();
+
+    _updateBadge();   // set initial badge on HomeScreen
 }
 
 
@@ -359,19 +501,6 @@ void AshuraCore::_buildAppMenu()
     items.push_back(std::move(item));
   }
   _ui.pushScreen(new AppMenuScreen(_display, items));
-}
-
-
-// ============================================================
-//  _launchScreenSaver
-// ============================================================
-
-void AshuraCore::_launchScreenSaver() {
-    int idx = AshuraPrefs::getScreensaver();
-    idx     = constrain(idx, 0, VIBE_COUNT - 1);
-
-    const Animation* anim = ALL_VIBES[idx].animation;
-    _ui.pushScreen(new VibePlayerScreen(_display, anim));
 }
 
 
