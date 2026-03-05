@@ -21,6 +21,15 @@ namespace Config {
 #define WS_SERVER_PORT 3000
 #define WS_SERVER_PATH "/ws"
 
+namespace Config {
+    namespace WebSocket {
+        static constexpr int           MAX_ATTEMPTS    = 6;
+        static constexpr unsigned long BACKOFF_BASE    = 1000UL;
+        static constexpr unsigned long BACKOFF_CAP     = 30000UL;
+        static constexpr unsigned long CONNECT_TIMEOUT = 5000UL;
+    }
+}
+
 // ============================================
 // Device Configuration
 // ============================================
