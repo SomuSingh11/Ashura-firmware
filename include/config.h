@@ -5,6 +5,14 @@
 // ============================================
 #define WIFI_SSID "********"
 #define WIFI_PASSWORD "********"
+namespace Config {
+    namespace WiFi {
+        static constexpr int MAX_ATTEMPTS = 8;
+        static constexpr unsigned long BACKOFF_BASE = 2000UL;
+        static constexpr unsigned long BACKOFF_CAP = 60000UL;
+        static constexpr unsigned long CONNECT_TIMEOUT = 8000UL;
+    }
+}
 
 // ============================================
 // WebSocket Server Configuration
@@ -12,6 +20,15 @@
 #define WS_SERVER_HOST "192.168.31.224"  
 #define WS_SERVER_PORT 3000
 #define WS_SERVER_PATH "/ws"
+
+namespace Config {
+    namespace WebSocket {
+        static constexpr int           MAX_ATTEMPTS    = 6;
+        static constexpr unsigned long BACKOFF_BASE    = 1000UL;
+        static constexpr unsigned long BACKOFF_CAP     = 30000UL;
+        static constexpr unsigned long CONNECT_TIMEOUT = 5000UL;
+    }
+}
 
 // ============================================
 // Device Configuration
@@ -81,3 +98,8 @@
 // ============================================
 #define WLED_HTTPCLIENT_TIMEOUT 3000
 #define WLED_MAX_DEVICES 8 
+
+// ============================================
+// Notification Configuration
+// ============================================
+#define MAX_NOTIFICATION_BUFFER 10

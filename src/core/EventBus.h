@@ -8,13 +8,19 @@
 // ============================================================
 enum class AppEvent {
     // ── WiFi ──────────────────────────────────────────────────
-    WifiConnected,
-    WifiDisconnected,
+    WifiConnected,              // just connected, payload = IP
+    WifiDisconnected,           // dropped mid-session
+    WifiFailed,                 // gave up after N attempts
+    WifiIdle,                   // no credentials, never tried
 
     // ── WebSocket ─────────────────────────────────────────────
-    WebSocketConnected,
-    WebSocketDisconnected,
-    WebSocketRegistered,
+    WebSocketConnected,         // socket open, not yet registered
+    WebSocketDisconnected,      // dropped
+    WebSocketRegistered,        // fully operational
+    WebSocketFailed,            // gave up after N attempts
+
+    // ── Notifications ─────────────────────────────────────────
+    NotificationPushed,         // new notification added to queue
 
     // ── Messaging ─────────────────────────────────────────────
     CommandReceived,
@@ -33,16 +39,18 @@ enum class AppEvent {
     ScreensaverStop,
 
     // ── System ────────────────────────────────────────────────
-    SystemTick,   // published every loop(), used by games/animations
+    SystemTick,    // published every loop(), used by games/animations
     SystemBoot,    // published at the end of init()
 
     // ── Companion: Pomodoro ───────────────────────────────────
-    PomodoroStarted,        // session began     → companion goes FOCUSED
-    PomodoroCompleted,      // full session      → companion goes HAPPY
-    PomodoroAborted,        // user cancelled    → companion goes IDLE
-    PomodoroBreak,          // break started     → companion goes HAPPY
-    SpotifyPlaying,         // track is playing  → companion EXCITED
-    SpotifyPaused,          // paused / stopped  → companion back to IDLE
+    PomodoroStarted,    // session began   → companion goes FOCUSED
+    PomodoroCompleted,  // full session ✓  → companion goes HAPPY
+    PomodoroAborted,    // user cancelled  → companion goes IDLE
+    PomodoroBreak,      // break started   → companion goes HAPPY
+
+    // ── Companion: Spotify ────────────────────────────────────
+    SpotifyPlaying,     // track is playing  → companion EXCITED
+    SpotifyPaused,      // paused / stopped  → companion back to IDLE
 };
 
 struct EventSubscription {
