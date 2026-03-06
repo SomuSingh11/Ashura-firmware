@@ -19,7 +19,7 @@
 //    LONG DOWN     jump to prev character category
 //    SELECT        append current character to string
 //    LONG SELECT   confirm — fire onDone(result), pop
-//    LONG BACK     cancel — pop without calling onDone (UIManager handles)
+//    LONG BACK     clears result string
 //
 //  Character categories (LONG UP/DOWN jumps between them):
 //    [0]  a-z        (26 chars)
@@ -74,10 +74,10 @@ class CharPickerWidget : public IScreen {
         static constexpr int CAT_COUNT      = 5;
 
         // stores all the start indices in one array.
-        static constexpr int CAT_STARTS[CAT_COUNT] = {
+        inline static constexpr int CAT_STARTS[CAT_COUNT] = {
             CAT_LOWER, CAT_UPPER, CAT_DIGITS, CAT_SYMBOLS, CAT_BACK
         };
-        static constexpr const char* CAT_NAMES[CAT_COUNT] = {
+        inline static constexpr const char* CAT_NAMES[CAT_COUNT] = {
             "a-z", "A-Z", "0-9", "!@#", "DEL"
         };
 

@@ -14,7 +14,10 @@
 // ── Apps ──────────────────────────────────────────────────────
 #include "../ui/screens/wled/WledDeviceScreen.h"
 #include "../ui/screens/clockApp/ClockFaceScreen.h"
+
+// ── Settings screens ────────────────────────────────────────────
 #include "../ui/screens/settings/SystemStatsScreen.h"
+#include "../ui/screens/settings/network/NetworkScreen.h"
 
 // ── Vibe system ───────────────────────────────────────────────
 #include "../ui/screens/vibes/VibePickerScreen.h"
@@ -199,10 +202,8 @@ void AshuraCore::_registerApps()
         "settings", "Settings", "settings",
         [this](DisplayManager& d) -> IScreen* {
             return new SubMenuScreen(d, "Settings", {
+                { "Network",      [this]() { _ui.pushScreen(new NetworkScreen(_display, _ui, _wifi, _websocket)); } },
                 { "System Stats", [this]() { _ui.pushScreen(new SystemStatsScreen(_display)); } },
-                { "WiFi",         [this]() { /* TODO */ } },
-                { "Display",      [this]() { /* TODO */ } },
-                { "About",        [this]() { /* TODO */ } },
             });
         }
     });

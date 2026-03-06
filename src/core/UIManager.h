@@ -65,6 +65,8 @@ class UIManager {
             } else if (screen->isDirty()){
                 screen->update();
             }
+
+            if(screen->wantsPop()) popScreen(); 
         }
 
         // ===== Input Forwarding =====
