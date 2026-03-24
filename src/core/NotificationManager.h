@@ -4,152 +4,222 @@
 #include "config.h"
 
 // ================================================================
-//  NotificationManager  —  Session-only notification queue
+//  NotificationManager  —  Ring buffer, session-only
 //
-//  Ring buffer of max 10 notifications. Oldest dropped when full.
-//  Notifications are lost on reboot (session-only by design).
-//  Persistence can be added later for email/messages if needed.
+//  Holds up to MAX_NOTIFICATIONS notifications in a circular buffer.
+//  Oldest is overwritten when full.
 //
-//  Types:
-//    SYSTEM   — WiFi failed, server unavailable, OS events
-//    ALERT    — time-sensitive warnings
-//    MESSAGE  — incoming messages from server / other devices
+//  Fields designed for future persistence (NVS) and actionability
+//  (Todoist, Calendar) without requiring rework:
+//    id         → auto-increment, stable across mark/read ops
+//    source     → "system" | "todoist" | "calendar" etc (String for now,
+//                  enum later when source set is stable)
+//    actionType → empty now, populated by future integrations
+//    actionData → empty now, JSON payload for action
 //
-//  Usage:
-//    Notifs().push(NotifType::SYSTEM, "WiFi", "Failed after 8 attempts");
-//    int n = Notifs().unreadCount();
-//    const Notification* latest = Notifs().latest();
-//    Notifs().markAllRead();
+//  Persistence upgrade path:
+//    Add save() after push() / markRead()
+//    Add load() in init()
+//    NotificationManager interface stays identical
 //
-//  HomeScreen polls unreadCount() each frame for the dot indicator.
-//  NotificationDetailScreen calls markAllRead() on enter.
+//  Global accessor: Notifs()
 // ================================================================
 
-enum class NotificationType {
-    SYSTEM,             // WiFi/WS failures, OS events
-    ALERT,              // time-sensitive warnings 
-    MESSAGE,            // incoming messages from server / other devices
+// ── Notification type ─────────────────────────────────────────
+//
+//  SYSTEM  — low priority, OS events (boot, WiFi connected, etc.)
+//  ALERT   — high priority, time-sensitive warnings (WiFi fail, errors)
+//  MESSAGE — normal priority, incoming from server / integrations
+enum class NotificationType : uint8_t {
+    SYSTEM  = 0,
+    ALERT   = 1,
+    MESSAGE = 2,
 };
 
+// Helper - return string literal for display
+inline char* notifTypeName(NotificationType t){
+    switch(t){
+        case NotificationType::SYSTEM:
+            return "SYS";
+        case NotificationType::ALERT:
+            return "ALERT";
+        case NotificationType::MESSAGE:
+            return "MSG";
+    }
+    return "UNK";
+}
+
+// ── Notification struct ───────────────────────────────────────
 struct Notification {
-    NotificationType    type        = NotificationType::SYSTEM;
-    String              title;
+    uint32_t            id;         //auto-increment (unique per session)
+    String              title;      
     String              body;
-    unsigned long       timestamp   = 0;
-    bool                read        = false;
+    NotificationType    type;       // SYSTEM | ALERT | MESSAGE (1 byte)
+    String              source;     // "system" | "todoist" | "calendar" | ...
+    String              actionType; // "" | "open_screen" | "todoist_done" | "snooze"
+    String              actionData; // JSON payload for action — empty for now
+    uint32_t            timestamp;  // millis() when pushed
+    bool                read;       // false = unread, true = read
+
+    bool hasAction() const { return actionType.length() > 0; }
+
 };
 
+
+// ── NotificationManager ───────────────────────────────────────
 class NotificationManager {
     public:
-        // ── Singleton ─────────────────────────────────────────────
-        static NotificationManager& instance() {
-            static NotificationManager _mgr;
-            return _mgr;
-        }
+        // ── Push ─────────────────────────────────────────────────
 
-        // ── Push a new notification ───────────────────────────────
-        // Drops oldest if buffer is full.
-        // Publishes NotificationPushed to EventBus.
-        void push(NotificationType type, const String& title, const String& body){
-            Notification notif;
-            notif.type = type;
-            notif.title = title;
-            notif.body = body;
-            notif.timestamp = millis();
-            notif.read = false;
+        int push(
+            const String&       title,
+            const String&       body        = "",
+            NotificationType    type        = NotificationType::SYSTEM,
+            const String&       source      = "system",
+            const String&       actionType  = "",
+            const String&       actionData  = ""
+        ){
+            Notification n;
+            n.id            = _nextId++;
+            n.title         = title;
+            n.body          = body;
+            n.type          = type;
+            n.source        = source;
+            n.actionType    = actionType;
+            n.actionData    = actionData;
+            n.timestamp     = millis();
+            n.read          = false;
 
-            if(_count < MAX_NOTIFICATION_BUFFER) {
-                _buf[_count++] = notif;
+            _buffer[_head] = n;
+
+            _head = (_head + 1) % MAX_NOTIFICATION_BUFFER;
+            if(_count < MAX_NOTIFICATION_BUFFER){
+                _count++;
             } else {
-                // Shift left -> drop oldest
-                for(int i=0; i<MAX_NOTIFICATION_BUFFER-1; i++){
-                    _buf[i] = _buf[i+1];
-                };
-                _buf[MAX_NOTIFICATION_BUFFER-1] = notif;
+                _tail = (_tail + 1) % MAX_NOTIFICATION_BUFFER; // overwrite the oldest
             }
 
-            Serial.println("[Notif] " + _typeStr(type) + " | " + title + ": " + body);
-            Bus().publish(AppEvent::NotificationPushed, title);
+            _unreadCount++;
+            return 0; // newest is always logical index 0
         }
 
-        // ── Accessors ─────────────────────────────────────────────
-        int  count()    const { return _count; }
-        bool isEmpty()  const { return _count == 0; }
 
-        int unreadCount() const {
-            int n=0;
+        // ── Access ────────────────────────────────────────────────
+
+        // Logical index: 0 = newest, count-1 = oldest
+        const Notification* get(int logicalIdx) const {
+            if(logicalIdx < 0 || logicalIdx >= _count) return nullptr;
+            int physical = (_head - 1 - logicalIdx + MAX_NOTIFICATION_BUFFER)%MAX_NOTIFICATION_BUFFER;
+            return &_buffer[physical];
+        }
+
+        // Mutable access for marking read and delete
+        Notification* getMutable(int logicalIdx){
+            if(logicalIdx < 0 || logicalIdx >= _count) return nullptr;
+            int physical = (_head - 1 - logicalIdx + MAX_NOTIFICATION_BUFFER)%MAX_NOTIFICATION_BUFFER;
+            return &_buffer[physical];
+        }
+
+        // Getters
+        int     count()         const { return _count; }
+        int     unreadCount()   const { return _unreadCount; }
+        bool    isEmpty()       const { return _count == 0; }
+
+        // Return logical index of most recent unread, or -1 if none
+        int latestUnreadIndex() const {
             for(int i=0; i<_count; i++){
-                if(!_buf[i].read) n++;
+                const Notification* n = get(i);
+                if(n && !n->read) return i;
             }
-            return n;
+            return -1;
         }
 
-        // Most recent notification (for ticker)
+        // Returns pointer to newest notification, or nullptr if empty
         const Notification* latest() const {
-            if(_count == 0) return nullptr;
-            return &_buf[_count-1];
+            return get(0);
         }
 
-        // Most recect unread (for badge dot)
-        const Notification* latestUnread() const {
-            for(int i=_count-1; i>=0; i--){
-                if(!_buf[i].read) return &_buf[i];
-            }
-            return nullptr;
-        }
-
-        // Get by index(0 = oldest, count-1 = latest)
-        const Notification* get(int index) const {
-            if(index < 0 || index >= _count) return nullptr;
-            return &_buf[index];
-        };
 
         // ── Mark read ─────────────────────────────────────────────
-        void markRead(int index) {
-            if(index >= 0 && index < _count) _buf[index].read = true;
+        void markRead(int logicalIndex){
+            Notification* n = getMutable(logicalIndex);
+            if(n && !n->read){
+                n->read = true;
+                if(_unreadCount > 0) _unreadCount--;
+            }
         }
 
         void markAllRead(){
-            for(int i=0; i<_count; i++) _buf[i].read = true;
-        }
-
-        // ── Clear ─────────────────────────────────────────────────
-        void clear() { _count=0; }
-
-        // ── Helpers ───────────────────────────────────────────────
-        static String typeLabel(NotificationType t){
-            switch(t) {
-                case NotificationType::SYSTEM: return "SYSTEM";
-                case NotificationType::ALERT:   return "ALERT";
-                case NotificationType::MESSAGE: return "MSG";
+            for(int i=0; i<_count; i++){
+                Notification* n = getMutable(i);
+                if(n) n->read = true;
             }
-            return "";
+            _unreadCount = 0;
         }
 
-        // Friendly relative timestamp string
-        String timeAgo(int index) const {
-            if(index<0 || index>=_count) return "";
-            unsigned long age = (millis()-_buf[index].timestamp) / 1000;
-            if (age < 60)   return String(age) + "s ago";
-            if (age < 3600) return String(age / 60) + "m ago";
-            return String(age / 3600) + "h ago";
+        
+        // ── Delete ────────────────────────────────────────────────
+        // Removes notification at logical index, rebuilds ring buffer without the deleted item.
+
+        bool remove(int logicalIndex){
+            if(logicalIndex < 0 || logicalIndex >= _count) return false;
+
+            // Adjust unread count before removing
+            Notification* n = getMutable(logicalIndex);
+            if(n && !n->read){
+                if(_unreadCount > 0)_unreadCount--;
+            }
+
+            // Copy all except the deleted item into temp array (newest first)
+            Notification temp[MAX_NOTIFICATION_BUFFER];
+            int tempCount = 0;
+            for(int i=0; i<_count; i++){
+                if(i == logicalIndex) continue;
+                const Notification* src = get(i);
+                if(src) temp[tempCount++] = *src;
+            }
+
+            // Rebuild ring buffer - insert oldest first so newest ends at head-1
+            _count = 0;
+            _head  = 0;
+            _tail  = 0;
+            for (int i = tempCount - 1; i >= 0; i--) {
+                _buffer[_head] = temp[i];
+                _head = (_head + 1) % MAX_NOTIFICATION_BUFFER;
+                _count++;
+            }
+    
+            return true;
         }
+
+        // ── Utility ───────────────────────────────────────────────
+        String timeAgo(uint32_t timestamp) const {
+            uint32_t elapsed = (millis() - timestamp) / 1000; // seconds
+            if(elapsed < 60) return "just now";
+            if(elapsed < 3600) return String(elapsed / 60) + "m ago";
+            if(elapsed < 86400) return String(elapsed / 3600) + "h ago";
+            return String(elapsed / 86400) + "d ago";
+        }
+
+        //  Overlaod - time ago for notification at logical index
+        String timeAgo(int logicalIndex) const {
+            const Notification* n = get(logicalIndex);
+            if(!n) return "";
+            return timeAgo(n->timestamp);
+        } 
+        
 
     private:
-        NotificationManager() = default;
-        Notification    _buf[MAX_NOTIFICATION_BUFFER];
+        Notification    _buffer[MAX_NOTIFICATION_BUFFER];
+        int             _head = 0;              // next write position
+        int             _tail = 0;              // oldest item position
         int             _count = 0;
-
-        static String _typeStr(NotificationType t){
-            switch(t){
-                case NotificationType::SYSTEM:  return "SYS";
-                case NotificationType::ALERT:   return "ALT";
-                case NotificationType::MESSAGE: return "MSG";
-            }
-
-            return "?";
-        }
+        int             _unreadCount = 0;
+        uint32_t        _nextId = 1;            // auto-increment ID
 };
 
-// Global shorthand
-inline NotificationManager& NotifMgr() { return NotificationManager::instance(); }
+// ── Global accessor - Single instance, accessible everywhere via Notifs() ───
+inline NotificationManager& NotifMgr() { 
+    static NotificationManager instance;
+    return instance;
+}

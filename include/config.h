@@ -103,3 +103,4 @@ namespace Config {
 // Notification Configuration
 // ============================================
 #define MAX_NOTIFICATION_BUFFER 10
+#define TOAST_DURATION_MS 3000
